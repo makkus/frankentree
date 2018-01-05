@@ -1,0 +1,298 @@
+#! /usr/bin/env bash
+#
+# ============================================================
+#
+# Script to manage a git repository containing Ansible roles
+#
+# Don't do anything weird with role names, as internally a '.' in the name
+# will be replaced with '_' which means that there could be some confusion
+# with role names.
+#
+# Also, only tested with https git urls, not ssh.
+#
+
+# =============================================================
+# global vars
+
+
+# =============================================================
+# Helper functions
+
+function command_exists {
+    type "$1" > /dev/null 2>&1 ;
+}
+
+function error_exit {
+
+    #	----------------------------------------------------------------
+    #	Function for exit due to fatal program error
+    #		Accepts 1 argument:
+    #			string containing descriptive error message
+    #	----------------------------------------------------------------
+
+    echo ""
+	  error_output "${PROGNAME}: ${1:-"Unknown Error"}" 1>&2
+    echo ""
+	  exit 1
+}
+
+function error_output {
+    # log $1
+    (>&2 echo "$@")
+}
+
+function clean_string {
+    eval "$1=$(echo "$2" | sed 's/[^a-zA-Z0-9_]/_/g')"
+}
+
+function prepare_github_api {
+
+    GITHUB_USERNAME=`git config github.user`
+    if [ "$GITHUB_USERNAME" = "" ]; then
+        echo ""
+        echo "Could not find username, run 'git config --global github.user <username>'"
+        echo ""
+        exit 1
+    fi
+
+    if command_exists secret-tool; then
+        GITHUB_TOKEN=`secret-tool lookup server api.github.com user "$GITHUB_USERNAME" key password`
+        if [[ -z "$GITHUB_TOKEN" ]]; then
+            echo ""
+            echo "No github token found in keyring, please create one with access to repo functions ( https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/ ), then store it via:
+
+  secret-tool store --label='github_token' server api.github.com user "$GITHUB_USERNAME" key password"
+            echo ""
+            exit 1
+        fi
+
+    else
+        echo ""
+        echo "Could not find 'secret-tool' executable, please install (e.g. 'apt install libsecret-tools')"
+        echo ""
+        exit 1
+    fi
+
+}
+
+function fork_repo {
+
+    prepare_github_api
+
+    local repo_url_local="$2"
+
+    local repo_name=${repo_url_local##*/}
+    repo_name=${repo_name%.*}
+
+    local user_name=${repo_url_local%/*}
+    user_name=${user_name##*/}
+
+    echo "Forking repo to user account: $GITHUB_USERNAME"
+    curl -su "$GITHUB_USERNAME:$GITHUB_TOKEN" "https://api.github.com/repos/$user_name/$repo_name/forks" -d '' 2>&1 > /dev/null || error_exit "Could not fork repo '$repo_url_local' to user account '$GITHUB_USERNAME"
+
+    eval "$1=https://github.com/${GITHUB_USERNAME}/${repo_name}.git"
+}
+
+# =============================================================
+# COMMANDS
+
+function command_push_upstream {
+
+    while getopts ":h" opt; do
+        case ${opt} in
+            h )
+                echo "Usage:"
+                echo "    repo-manage push-upstream -h              display this help message."
+                echo "    repo-manage push-upstream ROLE_NAME       pushes changes to upstream role repo."
+                exit 0
+                ;;
+            \? )
+                echo "Invalid Option: -$OPTARG" 1>&2
+                exit 1
+                ;;
+            : )
+                echo "Invalid Option: -$OPTARG requires an argument" 1>&2
+                exit 1
+                ;;
+        esac
+    done
+
+    shift $((OPTIND -1))
+
+    if [[ "$#" -ne 1 ]]; then
+        echo ""
+        echo "Illegal number of arguments: exactly one ROLE_NAME allowed."
+        echo ""
+        exit 1
+    fi
+
+    # reading path to role
+    while read -r line; do
+        if [[  -z "$line" ]]; then
+            continue
+        fi
+        declare "$line";
+    done <".role_repos"
+
+    clean_string role_key "$1"
+    role_path=${!role_key}
+    role_name=$(basename ${role_path})
+
+    git subtree push --prefix "${role_path}" "${role_key}_upstream" master
+
+}
+
+function command_pull_upstream {
+
+   while getopts ":h" opt; do
+     case ${opt} in
+     h )
+      echo "Usage:"
+      echo "    repo-manage pull-upstream -h              display this help message."
+      echo "    repo-manage pull-upstream ROLE_NAME       pulls changes from upstream repo."
+      exit 0
+      ;;
+     \? )
+       echo "Invalid Option: -$OPTARG" 1>&2
+       exit 1
+       ;;
+     : )
+       echo "Invalid Option: -$OPTARG requires an argument" 1>&2
+       exit 1
+       ;;
+     esac
+   done
+
+
+   shift $((OPTIND -1))
+
+   if [[ "$#" -ne 1 ]]; then
+      echo ""
+      echo "Illegal number of arguments: exactly one ROLE_NAME allowed."
+      echo ""
+      exit 1
+   fi
+
+   # reading path to role
+   while read -r line; do
+       if [[  -z "$line" ]]; then
+           continue
+       fi
+       declare "$line";
+   done <".role_repos"
+
+   clean_string role_key "$1"
+   role_path=${!role_key}
+   role_name=$(basename ${role_path})
+
+   # fetch updates
+   git fetch "${role_key}_upstream"
+
+   git subtree pull --prefix "${role_path}" "${role_key}_upstream" master --squash
+
+
+}
+
+function command_add {
+   fork=false
+   while getopts ":hfp:" opt; do
+     case ${opt} in
+     h )
+      echo "Usage:"
+      echo "    repo-manage add -h                                display this help message."
+      echo "    repo-manage add [-f] -p LOCAL_PATH REPO_URL       adds a remote repo."
+      exit 0
+      ;;
+     f )
+       fork=true
+       ;;
+     p )
+       local_path=$OPTARG
+       ;;
+     \? )
+       echo "Invalid Option: -$OPTARG" 1>&2
+       exit 1
+       ;;
+     : )
+       echo "Invalid Option: -$OPTARG requires an argument" 1>&2
+       exit 1
+       ;;
+     esac
+   done
+
+   shift $((OPTIND -1))
+
+   if [[ -z "$local_path" ]]; then
+      echo ""
+      echo "No local path provided, please use '-p' option"
+      echo ""
+      exit 1
+   else
+      if [[ -e ${local_path} ]]; then
+        echo ""
+        echo "Path '${local_path}' already exists"
+        echo ""
+        exit 1
+      fi
+   fi
+
+   if [[ "$#" -ne 1 ]]; then
+      echo ""
+      echo "Illegal number of arguments: exactly one REPO_URL allowed."
+      echo ""
+      exit 1
+   fi
+
+   repo_url="$1"
+   echo "$repo_url"
+   dir_name=$(basename ${local_path})
+   clean_string role_name "$dir_name"
+
+   if [ "${fork}" = true ]; then
+
+      fork_repo repo_url "$repo_url"
+
+   fi
+
+   upstream_alias="${role_name}_upstream"
+
+   # adding alias
+   git remote add -f ${upstream_alias} ${repo_url} || error_exit "Could not add remote '${repo_url}'"
+   # adding repo
+   git subtree add --prefix ${local_path} ${upstream_alias} master --squash || error_exit "Could not add remote tree '${repo_url}' to: ${local_path}"
+
+   echo "Added repositury '${repo_url}' (using alias '${upstream_alias}' at path: ${local_path}"
+   echo "${role_name}=${local_path}" >> .role_repos
+
+   git add .role_repos
+   git commit -m "Added remote role repo '${repo_url}' (alias: ${upstream_alias})to path: ${local_path}"
+}
+
+
+
+# =============================================================
+# VARS
+
+PROGNAME="repo-manage"
+
+# =============================================================
+# ARG PARSING
+
+subcommand=$1
+shift
+
+git diff-index --quiet HEAD -- || error_exit "local git repository has modifications, not doing anything..."
+
+case "$subcommand" in
+  add)
+    command_add "$@"
+    ;;
+  pull-upstream)
+    command_pull_upstream "$@"
+    ;;
+  push-upstream)
+    command_push_upstream "$@"
+    ;;
+esac
+
+#eval "command_$subcommand $repo_url"
