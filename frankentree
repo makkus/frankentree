@@ -2,11 +2,11 @@
 #
 # ============================================================
 #
-# Script to manage a git repository containing Ansible roles
+# Script to manage/assemble a git repository using git subtree.
 #
-# Don't do anything weird with role names, as internally a '.' in the name
+# Don't do anything weird with folder names, as internally a '.' in the name
 # will be replaced with '_' which means that there could be some confusion
-# with role names.
+# with ansible role names for example.
 #
 # Also, only tested with https git urls, not ssh.
 #
