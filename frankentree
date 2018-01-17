@@ -99,7 +99,7 @@ function fork_repo {
 function display_push_upstream_help {
     echo "Usage:"
     echo "    repo-manage push-upstream -h              display this help message."
-    echo "    repo-manage push-upstream FOLDER_NAME     pushes changes to upstream repo."
+    echo "    repo-manage push-upstream FOLDER_PATH     pushes changes to upstream repo."
 }
 
 function command_push_upstream {
@@ -127,7 +127,7 @@ function command_push_upstream {
 
     if [[ "$#" -ne 1 ]]; then
         echo ""
-        echo "Illegal number of arguments: exactly one FOLDER_NAME allowed."
+        echo "Illegal number of arguments: exactly one FOLDER_PATH allowed."
         echo ""
         display_push_upstream_help
         exit 1
@@ -136,25 +136,25 @@ function command_push_upstream {
     check_git_status
 
     # reading path to role
-    while read -r line; do
-        if [[  -z "$line" ]]; then
-            continue
-        fi
-        declare "$line";
-    done <".folder_repos"
+    # while read -r line; do
+        # if [[  -z "$line" ]]; then
+            # continue
+        # fi
+        # declare "$line";
+    # done <".folder_repos"
 
-    clean_string role_key "$1"
-    role_path=${!role_key}
-    role_name=$(basename ${role_path})
+    # clean_string role_key "$1"
+    folder_path=$1
+    upstream_name=$1
 
-    git subtree push --prefix "${role_path}" "${role_key}_upstream" master
+    git subtree push --prefix "${folder_path}" "${upstream_name}" master
 
 }
 
 function display_pull_upstream_help {
     echo "Usage:"
     echo "    repo-manage pull-upstream -h              display this help message."
-    echo "    repo-manage pull-upstream FOLDER_NAME     pulls changes from upstream repo."
+    echo "    repo-manage pull-upstream FOLDER_PATH     pulls changes from upstream repo."
 }
 
 function command_pull_upstream {
@@ -182,7 +182,7 @@ function command_pull_upstream {
 
    if [[ "$#" -ne 1 ]]; then
       echo ""
-      echo "Illegal number of arguments: exactly one FOLDER_NAME allowed."
+      echo "Illegal number of arguments: exactly one FOLDER_PATH allowed."
       echo ""
       display_pull_upstream_help
       exit 1
@@ -190,22 +190,14 @@ function command_pull_upstream {
 
    check_git_status
 
-   # reading path to role
-   while read -r line; do
-       if [[  -z "$line" ]]; then
-           continue
-       fi
-       declare "$line";
-   done <".folder_repos"
-
-   clean_string role_key "$1"
-   role_path=${!role_key}
-   role_name=$(basename ${role_path})
+   folder_path=$1
+   # upstream_name=$(echo "${folder_path}" | sed 's:/:_:g')
+   upstream_name=${1}
 
    # fetch updates
-   git fetch "${role_key}_upstream"
+   git fetch "${upstream_name}"
 
-   git subtree pull --prefix "${role_path}" "${role_key}_upstream" master --squash
+   git subtree pull --prefix "${folder_path}" "${upstream_name}" master --squash
 
 
 }
@@ -213,12 +205,13 @@ function command_pull_upstream {
 function display_add_help {
     echo "Usage:"
     echo "    repo-manage add -h                                display this help message."
-    echo "    repo-manage add [-f] -p LOCAL_PATH REPO_URL       adds a remote repo."
+    echo "    repo-manage add [-f] -u REPO_URL LOCAL_PATH       adds a remote repo."
 }
 
 function command_add {
+
    fork=false
-   while getopts ":hfp:" opt; do
+   while getopts ":hfu:" opt; do
      case ${opt} in
      h )
       display_add_help
@@ -227,8 +220,8 @@ function command_add {
      f )
        fork=true
        ;;
-     p )
-       local_path=$OPTARG
+     u )
+       repo_url=$OPTARG
        ;;
      \? )
        echo "Invalid Option: -$OPTARG" 1>&2
@@ -245,42 +238,41 @@ function command_add {
 
    shift $((OPTIND -1))
 
-   if [[ -z "$local_path" ]]; then
+   if [[ -z "$repo_url" ]]; then
       echo ""
-      echo "No local path provided, please use '-p' option"
+      echo "No repo url provided, please use '-u' option"
       echo ""
       display_add_help
       exit 1
-   else
-      if [[ -e ${local_path} ]]; then
-        echo ""
-        echo "Path '${local_path}' already exists"
-        echo ""
-        exit 1
-      fi
    fi
 
    if [[ "$#" -ne 1 ]]; then
       echo ""
-      echo "Illegal number of arguments: exactly one REPO_URL allowed."
+      echo "Illegal number of arguments: exactly one LOCAL_PATH argument allowed."
       echo ""
       exit 1
    fi
 
    check_git_status
 
-   repo_url="$1"
-   echo "$repo_url"
-   dir_name=$(basename ${local_path})
-   clean_string role_name "$dir_name"
+   local_path="$1"
 
-   if [ "${fork}" = true ]; then
-
-      fork_repo repo_url "$repo_url"
-
+   if [[ -e ${local_path} ]]; then
+       echo ""
+       echo "Path '${local_path}' already exists"
+       echo ""
+       exit 1
    fi
 
-   upstream_alias="${role_name}_upstream"
+   # dir_name=$(basename ${local_path})
+   # clean_string role_name "$dir_name"
+
+   if [ "${fork}" = true ]; then
+      fork_repo repo_url "$repo_url"
+   fi
+
+   #upstream_alias=$(echo ${local_path} | sed 's:/:_:g')
+   upstream_alias=${local_path}
 
    # adding alias
    git remote add -f ${upstream_alias} ${repo_url} || error_exit "Could not add remote '${repo_url}'"
@@ -288,12 +280,12 @@ function command_add {
    git subtree add --prefix ${local_path} ${upstream_alias} master --squash || error_exit "Could not add remote tree '${repo_url}' to: ${local_path}"
 
    echo "Added repositury '${repo_url}' (using alias '${upstream_alias}' at path: ${local_path}"
-   echo "${role_name}=${local_path}" >> .folder_repos
-   echo "${role_name}=${repo_url}" >> .remote_repos
+   # echo "${role_name}=${local_path}" >> .folder_repos
+   echo "${local_path}=${repo_url}" >> .remote_repos
 
-   git add .folder_repos
+   # git add .folder_repos
    git add .remote_repos
-   git commit -m "Added remote folder repo '${repo_url}' (alias: ${upstream_alias})to path: ${local_path}"
+   git commit -m "Added remote folder repo '${repo_url}' (alias: ${upstream_alias}) to path: ${local_path}"
 }
 
 function display_help {
@@ -305,7 +297,7 @@ function display_help {
 }
 
 function check_git_status {
-    git diff-index --quiet HEAD -- || error_exit "local git repository has modifications, not doing anything..."
+    git diff-index --quiet HEAD -- || error_exit "local git repository has modifications (or is not a git repository), not doing anything..."
 }
 
 # =============================================================
