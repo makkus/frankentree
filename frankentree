@@ -77,7 +77,7 @@ function prepare_github_api {
 
 function fork_repo {
 
-    prepare_github_api
+    #prepare_github_api
 
     local repo_url_local="$2"
 
@@ -87,10 +87,18 @@ function fork_repo {
     local user_name=${repo_url_local%/*}
     user_name=${user_name##*/}
 
-    echo "Forking repo to user account: $GITHUB_USERNAME"
-    curl -su "$GITHUB_USERNAME:$GITHUB_TOKEN" "https://api.github.com/repos/$user_name/$repo_name/forks" -d '' 2>&1 > /dev/null || error_exit "Could not fork repo '$repo_url_local' to user account '$GITHUB_USERNAME"
+    local fork_user_name="$3"
 
-    eval "$1=https://github.com/${GITHUB_USERNAME}/${repo_name}.git"
+    if [ "${fork_user_name}" == "${GITHUB_USERNAME}" ]; then
+        payload="{}"
+    else
+        payload="{\"organization\": \"${fork_user_name}\"}"
+    fi
+
+    echo "Forking repo to github user account: $fork_user_name"
+    curl -su "$GITHUB_USERNAME:$GITHUB_TOKEN" "https://api.github.com/repos/$user_name/$repo_name/forks" -d "${payload}" 2>&1 > /dev/null || error_exit "Could not fork repo '$repo_url_local' to user account '$GITHUB_USERNAME"
+
+    eval "$1=https://github.com/${fork_user_name}/${repo_name}.git"
 }
 
 # =============================================================
@@ -205,13 +213,13 @@ function command_pull_upstream {
 function display_add_help {
     echo "Usage:"
     echo "    repo-manage add -h                                display this help message."
-    echo "    repo-manage add [-f] -u REPO_URL LOCAL_PATH       adds a remote repo."
+    echo "    repo-manage add [-g] [-f] -u REPO_URL LOCAL_PATH       adds a remote repo."
 }
 
 function command_add {
 
    fork=false
-   while getopts ":hfu:" opt; do
+   while getopts ":hfg:u:" opt; do
      case ${opt} in
      h )
       display_add_help
@@ -219,6 +227,9 @@ function command_add {
       ;;
      f )
        fork=true
+       ;;
+     g )
+       gh_username=$OPTARG
        ;;
      u )
        repo_url=$OPTARG
@@ -268,7 +279,15 @@ function command_add {
    # clean_string role_name "$dir_name"
 
    if [ "${fork}" = true ]; then
-      fork_repo repo_url "$repo_url"
+
+       prepare_github_api
+
+       if [ -z ${gh_username} ]; then
+           gh_username=${GITHUB_USERNAME}
+       fi
+
+       fork_repo repo_url "$repo_url" "$gh_username"
+
    fi
 
    #upstream_alias=$(echo ${local_path} | sed 's:/:_:g')
