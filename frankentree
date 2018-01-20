@@ -135,6 +135,8 @@ function command_push_upstream {
 
     check_git_status
 
+    check_if_frankenrepo
+
     if [[ -z "$1" ]]; then
         local temp=$(get_all_paths)
         repos=(`echo $temp | sed -e 's/:/\n/g'`)
@@ -193,6 +195,8 @@ function command_pull_upstream {
 
    check_git_status
 
+   check_if_frankenrepo
+
    if [[ -z "$1" ]]; then
        local temp=$(get_all_paths)
        repos=(`echo $temp | sed -e 's/:/\n/g'`)
@@ -222,6 +226,16 @@ function pull_upstream_path {
     git fetch "${upstream_name}"
 
     git subtree pull --prefix "${folder_path}" "${upstream_name}" master --squash
+
+}
+
+function check_if_frankenrepo {
+
+    if [ ! -f .remote_repos ]; then
+        echo
+        echo "File '.remote_repos' not found, this is not a frankentree!"
+        exit 1
+    fi
 
 }
 
@@ -294,6 +308,7 @@ function command_clone {
 
     cd "${dir}"
 
+    check_if_frankenrepo
     create_remotes
 
 
