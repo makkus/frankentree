@@ -106,8 +106,8 @@ function fork_repo {
 
 function display_push_upstream_help {
     echo "Usage:"
-    echo "    repo-manage push-upstream -h              display this help message."
-    echo "    repo-manage push-upstream FOLDER_PATH     pushes changes to upstream repo."
+    echo "    frankentree push -h                    display this help message."
+    echo "    frankentree push [FOLDER_PATH] ...     pushes changes to upstream repo."
 }
 
 function command_push_upstream {
@@ -133,36 +133,39 @@ function command_push_upstream {
 
     shift $((OPTIND -1))
 
-    if [[ "$#" -ne 1 ]]; then
-        echo ""
-        echo "Illegal number of arguments: exactly one FOLDER_PATH allowed."
-        echo ""
-        display_push_upstream_help
-        exit 1
-    fi
-
     check_git_status
 
-    # reading path to role
-    # while read -r line; do
-        # if [[  -z "$line" ]]; then
-            # continue
-        # fi
-        # declare "$line";
-    # done <".folder_repos"
+    if [[ -z "$1" ]]; then
+        local temp=$(get_all_paths)
+        repos=(`echo $temp | sed -e 's/:/\n/g'`)
+        for path in "${repos[@]}"
+        do
+            echo
+            echo "Pushing to remote for: ${path}"
+            push_upstream_path "${path}"
+        done
+    else
+        for path in "$@"
+        do
+            echo
+            echo "Pushing to remote for: ${path}"
+            push_upstream_path "${path}"
+        done
+    fi
+}
 
-    # clean_string role_key "$1"
+function push_upstream_path {
+
     folder_path=$1
     upstream_name=$1
 
     git subtree push --prefix "${folder_path}" "${upstream_name}" master
-
 }
 
 function display_pull_upstream_help {
     echo "Usage:"
-    echo "    repo-manage pull-upstream -h              display this help message."
-    echo "    repo-manage pull-upstream FOLDER_PATH     pulls changes from upstream repo."
+    echo "    frankentree pull -h                    display this help message."
+    echo "    frankentree pull [FOLDER_PATH] ...     pulls changes from upstream repo."
 }
 
 function command_pull_upstream {
@@ -188,32 +191,134 @@ function command_pull_upstream {
 
    shift $((OPTIND -1))
 
-   if [[ "$#" -ne 1 ]]; then
-      echo ""
-      echo "Illegal number of arguments: exactly one FOLDER_PATH allowed."
-      echo ""
-      display_pull_upstream_help
-      exit 1
-   fi
-
    check_git_status
 
-   folder_path=$1
-   # upstream_name=$(echo "${folder_path}" | sed 's:/:_:g')
-   upstream_name=${1}
+   if [[ -z "$1" ]]; then
+       local temp=$(get_all_paths)
+       repos=(`echo $temp | sed -e 's/:/\n/g'`)
+       for path in "${repos[@]}"
+       do
+           echo
+           echo "Pulling from remote for: ${path}"
+           pull_upstream_path "${path}"
+       done
+   else
+       for path in "$@"
+       do
+           echo
+           echo "Pulling from remote for: ${path}"
+           pull_upstream_path "${path}"
+       done
+   fi
 
-   # fetch updates
-   git fetch "${upstream_name}"
+}
 
-   git subtree pull --prefix "${folder_path}" "${upstream_name}" master --squash
+function pull_upstream_path {
+
+    folder_path=${1}
+    upstream_name=${1}
+
+    # fetch updates
+    git fetch "${upstream_name}"
+
+    git subtree pull --prefix "${folder_path}" "${upstream_name}" master --squash
+
+}
+
+function get_all_paths {
+
+    # reading .remote_repos file
+    local result=""
+    while read -r line; do
+        if [[  -z "$line" ]]; then
+            continue
+        fi
+        local temp="${line%=*}"
+        result="${result}:${temp}"
+    done <".remote_repos"
+
+    echo "$result"
 
 
 }
 
 function display_add_help {
     echo "Usage:"
-    echo "    repo-manage add -h                                display this help message."
-    echo "    repo-manage add [-g] [-f] -u REPO_URL LOCAL_PATH       adds a remote repo."
+    echo "    frankentree add -h                                display this help message."
+    echo "    frankentree add [-g] [-f] -u REPO_URL LOCAL_PATH       adds a remote repo."
+}
+
+function display_clone_help {
+    echo "Usage:"
+    echo "    frankentree clone -h                                display this help message."
+    echo "    frankentree clone GIT_REPO_URL                      Clones a git repo and initializes the frankentree remotes."
+
+}
+
+function command_clone {
+
+    while getopts ":h" opt; do
+        case ${opt} in
+
+            h )
+                display_clone_help
+                exit 0
+                ;;
+            \? )
+                echo "Invalid Option: -$OPTARG" 1>&2
+                display_clone_help
+                exit 1
+                ;;
+            : )
+                echo "Invalid Option: -$OPTARG requires an argument" 1>&2
+                display_clone_help
+                exit 1
+                ;;
+        esac
+    done
+
+    shift $((OPTIND -1))
+
+    if [[ -z "$1" ]]; then
+        echo ""
+        echo "No git repo url provided."
+        echo ""
+        display_clone_help
+        exit 1
+    fi
+
+    echo
+
+    git clone "${1}" || error_exit "Could not clone repository '${1}..."
+    dir=$(basename ${1} .git)
+
+    cd "${dir}"
+
+    create_remotes
+
+
+}
+
+function create_remotes {
+    local temp=$(get_all_paths)
+    paths=(`echo $temp | sed -e 's/:/\n/g'`)
+    for path in "${paths[@]}"
+    do
+        url=$(get_remote_for_path "${path}")
+        echo
+        echo "Adding remote '${url}' for path '${path}'"
+        git remote add -f ${path} ${url} || error_exit "Could not add remote '${url}' for path '${path}'"
+    done
+
+}
+
+function get_remote_for_path {
+
+    local line=$(grep "${1}" .remote_repos)
+
+    local url=${line##*=}
+    echo "${url}"
+
 }
 
 function command_add {
@@ -235,10 +340,10 @@ function command_add {
        repo_url=$OPTARG
        ;;
      \? )
-       echo "Invalid Option: -$OPTARG" 1>&2
-       display_add_help
-       exit 1
-       ;;
+         echo "Invalid Option: -$OPTARG" 1>&2
+         display_add_help
+         exit 1
+         ;;
      : )
        echo "Invalid Option: -$OPTARG requires an argument" 1>&2
        display_add_help
@@ -310,9 +415,10 @@ function command_add {
 function display_help {
     echo "Usage:"
     echo "    frankentree -h                      Display this help message."
+    echo "    frankentree clone                   Clones an existing frankentree."
     echo "    frankentree add                     Adds a git subtree."
-    echo "    frankentree pull-upstream           (git) pulls all subtrees."
-    echo "    frankentree push-upstream           (git) pushes all subtrees."
+    echo "    frankentree pull           (git) pulls all subtrees."
+    echo "    frankentree push           (git) pushes all subtrees."
 }
 
 function check_git_status {
@@ -322,7 +428,7 @@ function check_git_status {
 # =============================================================
 # VARS
 
-PROGNAME="repo-manage"
+PROGNAME="frankentree"
 
 # =============================================================
 # ARG PARSING
@@ -352,13 +458,16 @@ subcommand=$1
 shift
 
 case "$subcommand" in
+  clone)
+    command_clone "$@"
+    ;;
   add)
     command_add "$@"
     ;;
-  pull-upstream)
+  pull)
     command_pull_upstream "$@"
     ;;
-  push-upstream)
+  push)
     command_push_upstream "$@"
     ;;
 esac
