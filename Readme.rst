@@ -19,7 +19,7 @@ It's mostly useful for cases where you need to end up with a collection of git r
 
 ``frankentree`` mostly follows the recommendation from `this blog-post <https://www.atlassian.com/blog/git/alternatives-to-git-submodule-git-subtree>`_.
 
-It allows you to add subtrees to an existing git repository, and it'll create a new remote using the (relative``) path name as the git remote name. In order to keep track of those remotes, it creates a file ``.remote_repos in the root of the frankentree.
+It allows you to add subtrees to an existing git repository, and it'll create a new remote using the (relative) path name as the git remote name. In order to keep track of those remotes, it creates a file ``.remote_repos`` in the root of the frankentree.
 
 The rest should be explained by the examples below. If not, open an issue and I'll improve this here.
 
