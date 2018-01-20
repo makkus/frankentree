@@ -8,8 +8,8 @@ Features
 *frankentree* is a git helper script which:
 
 - lets you assemble git repositories that are composed of other git repositories (using ``git subtree``)
-- supports pulling from upstream for one or all sub repositories
-- supports pushing from upstream for one or all sub repositories
+- supports pulling from upstream for one or all of the sub repositories
+- supports pushing from upstream for one or all of the sub repositories
 - can automatically fork sub-repositories if needed, to both your personal github account or an organization you are member of
 
 Description
