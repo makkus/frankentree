@@ -47,7 +47,7 @@ Directly from upstream
 
 .. code-block:: console
 
-   frankentree add -u <source_git_url> <target_path>
+   frankentree add -u <source_git_url> <relative_sub_tree_path>
 
 Forking to personal Github account before adding
 ++++++++++++++++++++++++++++++++++++++++++++++++
@@ -56,7 +56,7 @@ This needs the ``secret-tool`` package installed. Also, it needs the git config 
 
 .. code-block:: console
 
-   frankentree add -f -u <source_git_url> <target_path>
+   frankentree add -f -u <source_git_url> <relative_sub_tree_path>
 
 Forking to Github organization before adding
 ++++++++++++++++++++++++++++++++++++++++++++
@@ -65,7 +65,7 @@ This needs the ``secret-tool`` package installed. Also, it needs the git config 
 
 .. code-block:: console
 
-   frankentree add -f -g <github_org_name> -u <source_git_url> <target_path>
+   frankentree add -f -g <github_org_name> -u <source_git_url> <relative_sub_tree_path>
 
 Pulling from upstream (all sub-trees)
 +++++++++++++++++++++++++++++++++++++
@@ -79,7 +79,7 @@ Pulling from upstream (one or several sub-trees)
 
 .. code-block:: console
 
-   frankentree pull [sub-tree-path] ...
+   frankentree pull [relative_sub_tree_path] ...
 
 Pushing to upstream (all sub-trees)
 +++++++++++++++++++++++++++++++++++
@@ -93,7 +93,7 @@ Pushing from upstream (one or several sub-trees)
 
 .. code-block:: console
 
-   frankentree push [sub-tree-path] ...
+   frankentree push [relative_sub_tree_path] ...
 
 
 Supported platforms
