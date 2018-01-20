@@ -17,7 +17,7 @@ Description
 
 This is a little helper script to manage repositories that are composed of other git repositories.
 
-It's mostly useful for cases where you need to end up with a collection of git repositories in a folder, and don't care too much about making changes, or pushing changes back upstream. Although that is supported as well. But if you want to do that, you're probably better of doing things manually.
+It's mostly useful for cases where you need to end up with a collection of git repositories in a folder, and don't care too much about making changes, or pushing changes back upstream. Although that is supported as well. But if you want to do that, you're probably better off doing things manually.
 
 ``frankentree`` mostly follows the recommendation from `this blog-post <https://www.atlassian.com/blog/git/alternatives-to-git-submodule-git-subtree>`_.
 
