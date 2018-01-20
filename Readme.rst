@@ -8,7 +8,7 @@ Features
 - lets you assemble git repositories that are composed of other git repositories (using ``git subtree``)
 - supports pulling from upstream for one or all of the sub-trees
 - supports pushing to upstream for one or all of the sub-trees
-- can automatically fork sub-repositories before adding if needed, to both your personal github account or an organization you are member of
+- can automatically fork sub-repositories before adding if needed, to both your personal github account or an organization you are member of. Only Github is supported for this feature, for now.
 
 Description
 -----------
@@ -52,12 +52,16 @@ Directly from upstream
 Forking to personal Github account before adding
 ++++++++++++++++++++++++++++++++++++++++++++++++
 
+This needs the ``secret-tool`` package installed. Also, it needs the git config value ``github.user`` configured with your Github username (``git config --global github.user <username>``).
+
 .. code-block:: console
 
    frankentree add -f -u <source_git_url> <target_path>
 
 Forking to Github organization before adding
 ++++++++++++++++++++++++++++++++++++++++++++
+
+This needs the ``secret-tool`` package installed. Also, it needs the git config value ``github.user`` configured with your Github username (``git config --global github.user <username>``).
 
 .. code-block:: console
 
