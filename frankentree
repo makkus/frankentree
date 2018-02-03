@@ -156,12 +156,80 @@ function command_push_upstream {
     fi
 }
 
+function display_push_upstream_branch_help {
+    echo "Usage:"
+    echo "    frankentree push-branch -h                             display this help message."
+    echo "    frankentree push-branch -b BRANCH_NAME LOCAL_PATH      pushes changes to upstream repo using specified branch name"
+}
+
+function command_push_upstream_branch {
+
+    while getopts ":hb:" opt; do
+        case ${opt} in
+            h )
+                display_push_upstream_branch_help
+                exit 0
+                ;;
+            b )
+                upstream_branch_name=$OPTARG
+                ;;
+            \? )
+                echo "Invalid Option: -$OPTARG" 1>&2
+                display_push_upstream_branch_help
+                exit 1
+                ;;
+            : )
+                echo "Invalid Option: -$OPTARG requires an argument" 1>&2
+                display_push_upstream_branch_help
+                exit 1
+                ;;
+        esac
+    done
+
+    shift $((OPTIND -1))
+
+    if [[ -z "$upstream_branch_name" ]]; then
+        echo ""
+        echo "No upstream branch name provided, please use '-b' option"
+        echo ""
+        display_push_upstream_branch_help
+        exit 1
+    fi
+
+    if [[ "$#" -ne 1 ]]; then
+        echo ""
+        echo "Illegal number of arguments: exactly one LOCAL_PATH argument allowed."
+        echo ""
+        exit 1
+    fi
+
+    check_git_status
+
+    check_if_frankenrepo
+
+    local path="${1}"
+    echo
+    echo "Pushing to remote for: ${path}"
+    push_upstream_feature_path "${path}" "${upstream_branch_name}"
+
+}
+
+
 function push_upstream_path {
 
     folder_path=$1
     upstream_name=$1
 
     git subtree push --prefix "${folder_path}" "${upstream_name}" master
+}
+
+function push_upstream_feature_path {
+
+    folder_path=$1
+    upstream_name=$1
+    upstream_branch_name=$2
+
+    git subtree push --prefix "${folder_path}" "${upstream_name}" "${upstream_branch_name}"
 }
 
 function display_pull_upstream_help {
@@ -225,7 +293,8 @@ function pull_upstream_path {
     # fetch updates
     git fetch "${upstream_name}"
 
-    git subtree pull --prefix "${folder_path}" "${upstream_name}" master --squash
+    # TODO: not sure whether to use squash or not
+    git subtree pull --prefix "${folder_path}" "${upstream_name}" master #--squash
 
 }
 
@@ -262,11 +331,55 @@ function display_add_help {
     echo "    frankentree add [-g] [-f] -u REPO_URL LOCAL_PATH       adds a remote repo."
 }
 
+function display_create_remotes_help {
+    echo "Usage:"
+    echo "    frankentree create-remotes -h                                display this help message."
+    echo "    frankentree create-remotes                                   creates any missing remotes in the (local) parent git repo"
+}
+
 function display_clone_help {
     echo "Usage:"
     echo "    frankentree clone -h                                display this help message."
     echo "    frankentree clone GIT_REPO_URL                      Clones a git repo and initializes the frankentree remotes."
 
+}
+
+function command_create_remotes {
+
+    while getopts ":h" opt; do
+        case ${opt} in
+
+            h )
+                display_create_remotes_help
+                exit 0
+                ;;
+            \? )
+                echo "Invalid Option: -$OPTARG" 1>&2
+                display_create_remotes_help
+                exit 1
+                ;;
+            : )
+                echo "Invalid Option: -$OPTARG requires an argument" 1>&2
+                display_create_remotes_help
+                exit 1
+                ;;
+        esac
+    done
+
+    shift $((OPTIND -1))
+
+    if [[ ! -z "$1" ]]; then
+        echo ""
+        echo "No argument allowed."
+        echo ""
+        display_create_remotes_help
+        exit 1
+    fi
+
+    echo
+
+    check_if_frankenrepo
+    create_remotes
 }
 
 function command_clone {
@@ -416,7 +529,9 @@ function command_add {
    # adding alias
    git remote add -f ${upstream_alias} ${repo_url} || error_exit "Could not add remote '${repo_url}'"
    # adding repo
-   git subtree add --prefix ${local_path} ${upstream_alias} master --squash || error_exit "Could not add remote tree '${repo_url}' to: ${local_path}"
+   # TODO: not sure whether to use git squash or not
+   #git subtree add --prefix ${local_path} ${upstream_alias} master --squash || error_exit "Could not add remote tree '${repo_url}' to: ${local_path}"
+   git subtree add --prefix ${local_path} ${upstream_alias} master || error_exit "Could not add remote tree '${repo_url}' to: ${local_path}"
 
    echo "Added repositury '${repo_url}' (using alias '${upstream_alias}' at path: ${local_path}"
    # echo "${role_name}=${local_path}" >> .folder_repos
@@ -431,9 +546,11 @@ function display_help {
     echo "Usage:"
     echo "    frankentree -h                      Display this help message."
     echo "    frankentree clone                   Clones an existing frankentree."
+    echo "    frankentree create-remotes          Creates any missing remote branches in the parent (local) git repo config."
     echo "    frankentree add                     Adds a git subtree."
-    echo "    frankentree pull           (git) pulls all subtrees."
-    echo "    frankentree push           (git) pushes all subtrees."
+    echo "    frankentree pull                    (git) pulls all subtrees."
+    echo "    frankentree push                    (git) pushes all subtrees."
+    echo "    frankentree push-branch             pushes changes to a subtree to it's remote, creating a feature branch that can be used for a pull request"
 }
 
 function check_git_status {
@@ -484,6 +601,12 @@ case "$subcommand" in
     ;;
   push)
     command_push_upstream "$@"
+    ;;
+  push-branch)
+    command_push_upstream_branch "$@"
+    ;;
+  create-remotes)
+    command_create_remotes "$@"
     ;;
 esac
 
