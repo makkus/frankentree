@@ -610,4 +610,4 @@ case "$subcommand" in
     ;;
 esac
 
-#eval "command_$subcommand $repo_url"
+exit 0
